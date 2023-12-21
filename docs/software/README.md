@@ -260,3 +260,162 @@ SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
 
 ## RESTfull сервіс для управління даними
 
+### Головний файл для запуску сервера server.js
+
+```js 
+'use strict';
+
+const express = require('express');
+const CONSTANTS = require('./controller/constants.js')
+
+const {
+  createUser, 
+  updateUser, 
+  getUser, 
+  deleteUser, 
+  getAllUsers, 
+  deleteAllUsers,
+} = require('./controller/controllers.js');
+
+const app = express()
+.use(express.json())
+.get('/user/:id', getUser)
+.get('/users/', getAllUsers)
+.post('/user/', createUser)
+.put('/user/:id', updateUser)
+.delete('/user/:id', deleteUser)
+.delete('/users/', deleteAllUsers);
+
+
+app.listen(CONSTANTS.port, () => {
+  console.log(`Server running on port ${CONSTANTS.port}`);
+});
+```
+
+### Файл з контроллерами користувача controllers.js
+
+```js
+'use strict';
+
+const CONSTANTS = require('./constants.js');
+const { pool } = require('../database/database.js');
+
+const getMaxUserId = () => {
+const scriptSQL = CONSTANTS.selectMaxId;
+
+  return new Promise((resolve, reject) => {
+    pool.query(scriptSQL, (error, result) => {
+      return resolve(result);
+    });
+  });
+};
+
+const createUser = (req, res) => {
+  if (!req.body) return res.sendStatus(CONSTANTS.badRequest);
+
+  getMaxUserId().then((data) => {
+    let maxId = data[0][CONSTANTS.maxId];
+    const scriptscriptSQL = `INSERT INTO opinio.User (id, mail, password, name, age, gender) VALUES (${++maxId},"${req.body.mail}", "${req.body.password}", "${req.body.name}", ${req.body.age || CONSTANTS.empty}, "${req.body.gender || CONSTANTS.empty}")`;
+    pool.query(scriptscriptSQL, (error, result) => {
+      if (error) return res.status(CONSTANTS.internalServerError).json(error);
+      result ? res.send(result) : res.sendStatus(CONSTANTS.notFound);
+    });
+  });
+};
+
+const updateUser = (req, res) => {
+  if (!req.body) return res.sendStatus(CONSTANTS.badRequest);
+
+  const updateFields = Object.keys(req.body);
+  const updateValues = updateFields.map(field => `${field} = "${req.body[field]}"`).join(", ");
+  const scriptSQL = `UPDATE opinio.User SET ${updateValues} WHERE id = ${req.params.id}`;
+  
+  pool.query(scriptSQL, (error, result) => {
+    if (error) return res.status(CONSTANTS.internalServerError).json(error);
+    result ? res.send(result) : res.sendStatus(CONSTANTS.notFound);
+  });
+};
+
+const getUser = (req, res) => {
+  const scriptSQL = `${CONSTANTS.select} ${req.params.id}`;
+
+  pool.query(scriptSQL, (error, result) => {
+    if (error) return res.status(CONSTANTS.internalServerError).json(error);
+    result ? res.send(result) : res.sendStatus(CONSTANTS.notFound);
+  });
+};
+
+const deleteUser = (req, res) => {
+  const scriptSQL = `${CONSTANTS.delete} ${req.params.id}`;
+
+  pool.query(scriptSQL, (error, result) => {
+    if (error) return res.status(CONSTANTS.internalServerError).json(error);
+    result ? res.send(result) : res.sendStatus(CONSTANTS.notFound);
+  });
+};
+
+const getAllUsers = (req, res) => {
+  const scriptSQL = CONSTANTS.selectAll;
+  pool.query(scriptSQL, (error, result) => {
+    if (error) return res.status(CONSTANTS.internalServerError).json(error);
+    result ? res.send(result) : res.sendStatus(CONSTANTS.notFound);
+  });
+};
+
+const deleteAllUsers = (req, res) => {
+  const scriptSQL = CONSTANTS.deleteAll;
+  pool.query(scriptSQL, (error, result) => {
+    if (error) return res.status(CONSTANTS.internalServerError).json(error);
+    result ? res.send(result) : res.sendStatus(CONSTANTS.notFound);
+  });
+};
+
+module.exports = { 
+  createUser, 
+  updateUser, 
+  getUser, 
+  deleteUser, 
+  getAllUsers, 
+  deleteAllUsers,
+};
+```
+
+### Файл з підключенням бази данних database.js
+
+```js
+'use strict';
+
+const mysql = require('mysql2');
+
+const pool = mysql.createConnection({
+  host: 'localhost',
+  user: 'root',
+  password: 'asd_1q2q3q4q5q',
+  database: 'opinio'
+});
+
+module.exports = { pool };
+```
+
+### Файл з константами constants.js
+
+```js
+'use strict';
+
+const CONSTANTS = {
+  port: 3000,
+  badRequest: 400,
+  internalServerError: 500,
+  notFound: 404,
+  empty: null,
+  maxId: 'MAX(id)',
+  select: 'SELECT * FROM opinio.User WHERE id =',
+  delete: 'DELETE FROM opinio.User WHERE id =',
+  deleteAll: 'DELETE FROM opinio.User',
+  selectAll: 'SELECT * FROM opinio.User',
+  insert: 'INSERT INTO opinio.User (id, mail, password, name, age, gender) VALUES (?, ?, ?, ?, ?, ?)',
+  selectMaxId: 'SELECT MAX(id) FROM opinio.User',
+};
+
+module.exports = CONSTANTS;
+```
